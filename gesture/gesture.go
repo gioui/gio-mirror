@@ -38,6 +38,8 @@ type Click struct {
 	clicks int
 	// pressed tracks whether the pointer is pressed.
 	pressed bool
+	// Buttons tracks which buttons are pressed.
+	Buttons pointer.Buttons
 	// entered tracks whether the pointer is inside the gesture.
 	entered bool
 	// pid is the pointer.ID.
@@ -54,6 +56,7 @@ type ClickEvent struct {
 	Position  f32.Point
 	Source    pointer.Source
 	Modifiers key.Modifiers
+	Buttons   pointer.Buttons
 	// NumClicks records successive clicks occurring
 	// within a short duration of each other.
 	NumClicks int
@@ -132,7 +135,7 @@ func (c *Click) Hovered() bool {
 	return c.entered
 }
 
-// Pressed returns whether a pointer is pressing.
+// Pressed returns whether a pointer is pressing the left mouse button.
 func (c *Click) Pressed() bool {
 	return c.pressed
 }
@@ -147,10 +150,12 @@ func (c *Click) Events(q event.Queue) []ClickEvent {
 		}
 		switch e.Type {
 		case pointer.Release:
-			if !c.pressed || c.pid != e.PointerID {
+			if c.pid != e.PointerID {
 				break
 			}
-			c.pressed = false
+			b := c.Buttons ^ e.Buttons // the released button
+			c.pressed = e.Buttons&pointer.ButtonPrimary > 0
+			c.Buttons = e.Buttons
 			if c.entered {
 				if e.Time-c.clickedAt < doubleClickDuration {
 					c.clicks++
@@ -158,22 +163,21 @@ func (c *Click) Events(q event.Queue) []ClickEvent {
 					c.clicks = 1
 				}
 				c.clickedAt = e.Time
-				events = append(events, ClickEvent{Type: TypeClick, Position: e.Position, Source: e.Source, Modifiers: e.Modifiers, NumClicks: c.clicks})
+				events = append(events, ClickEvent{Type: TypeClick, Position: e.Position, Source: e.Source, Buttons: b, Modifiers: e.Modifiers, NumClicks: c.clicks})
 			} else {
-				events = append(events, ClickEvent{Type: TypeCancel})
+				events = append(events, ClickEvent{Type: TypeCancel, Buttons: b})
 			}
 		case pointer.Cancel:
-			wasPressed := c.pressed
-			c.pressed = false
+			b := e.Buttons ^ c.Buttons
+			wasPressed := c.Buttons.Contain(b)
+			c.pressed = e.Buttons&pointer.ButtonPrimary > 0
+			c.Buttons = e.Buttons
 			c.entered = false
 			if wasPressed {
-				events = append(events, ClickEvent{Type: TypeCancel})
+				events = append(events, ClickEvent{Type: TypeCancel, Buttons: b})
 			}
 		case pointer.Press:
-			if c.pressed {
-				break
-			}
-			if e.Source == pointer.Mouse && e.Buttons != pointer.ButtonPrimary {
+			if e.Source == pointer.Mouse && e.Buttons == c.Buttons {
 				break
 			}
 			if !c.entered {
@@ -182,17 +186,17 @@ func (c *Click) Events(q event.Queue) []ClickEvent {
 			if c.pid != e.PointerID {
 				break
 			}
-			c.pressed = true
-			events = append(events, ClickEvent{Type: TypePress, Position: e.Position, Source: e.Source, Modifiers: e.Modifiers})
+			c.pressed = e.Buttons&pointer.ButtonPrimary > 0
+			events = append(events, ClickEvent{Type: TypePress, Position: e.Position, Source: e.Source, Buttons: e.Buttons, Modifiers: e.Modifiers})
 		case pointer.Leave:
-			if !c.pressed {
+			if !c.Buttons.Contain(c.Buttons ^ e.Buttons) {
 				c.pid = e.PointerID
 			}
 			if c.pid == e.PointerID {
 				c.entered = false
 			}
 		case pointer.Enter:
-			if !c.pressed {
+			if !c.Buttons.Contain(c.Buttons ^ e.Buttons) {
 				c.pid = e.PointerID
 			}
 			if c.pid == e.PointerID {

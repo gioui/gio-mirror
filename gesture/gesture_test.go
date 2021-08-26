@@ -35,6 +35,21 @@ func TestMouseClicks(t *testing.T) {
 				100*time.Millisecond+doubleClickDuration+1),
 			clicks: []int{1, 1},
 		},
+		{
+			label: "left and right clicks mixed",
+			events: mouseMultiButtonClickEvents(
+				100*time.Millisecond,
+				100*time.Millisecond+doubleClickDuration*1+1,
+				100*time.Millisecond+doubleClickDuration*2+1,
+				100*time.Millisecond+doubleClickDuration*3+1,
+				100*time.Millisecond+doubleClickDuration*4+1,
+				100*time.Millisecond+doubleClickDuration*5+1,
+				100*time.Millisecond+doubleClickDuration*6+1,
+				100*time.Millisecond+doubleClickDuration*7+1,
+				100*time.Millisecond+doubleClickDuration*8+1,
+			),
+			clicks: []int{1, 1, 1, 1, 1, 1, 1, 1, 1},
+		},
 	} {
 		t.Run(tc.label, func(t *testing.T) {
 			var click Click
@@ -84,4 +99,50 @@ func filterMouseClicks(events []ClickEvent) []ClickEvent {
 		}
 	}
 	return clicks
+}
+
+func mouseMultiButtonClickEvents(times ...time.Duration) []event.Event {
+	events := make([]event.Event, 0)
+	numSecondaryClick := 0
+	numPrimaryClick := 0
+	for i, _ := range times {
+		if i%2 == 0 {
+			press := pointer.Event{
+				Type:    pointer.Press,
+				Source:  pointer.Mouse,
+				Buttons: pointer.ButtonPrimary,
+			}
+			numPrimaryClick++
+			events = append(events, press)
+		} else {
+			press := pointer.Event{
+				Type:    pointer.Press,
+				Source:  pointer.Mouse,
+				Buttons: pointer.ButtonSecondary,
+			}
+			numSecondaryClick++
+			events = append(events, press)
+		}
+	}
+	i := 0
+	for ; i < numPrimaryClick; i++ {
+		release := pointer.Event{
+			Type:    pointer.Release,
+			Source:  pointer.Mouse,
+			Buttons: pointer.ButtonPrimary,
+			Time:    times[i],
+		}
+		events = append(events, release)
+	}
+	for ; i < numSecondaryClick+numPrimaryClick; i++ {
+		release := pointer.Event{
+			Type:    pointer.Release,
+			Source:  pointer.Mouse,
+			Buttons: pointer.ButtonSecondary,
+			Time:    times[i],
+		}
+
+		events = append(events, release)
+	}
+	return events
 }
