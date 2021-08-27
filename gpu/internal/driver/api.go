@@ -29,6 +29,9 @@ type Direct3D11RenderTarget struct {
 type MetalRenderTarget struct {
 	// Texture is a MTLTexture.
 	Texture unsafe.Pointer
+	// Drawable is an MTLDrawable. If non-nil, it is queued for presentation
+	// when the target is bound.
+	Drawable unsafe.Pointer
 }
 
 type OpenGL struct {

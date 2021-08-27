@@ -55,17 +55,6 @@ static CFTypeRef drawableTexture(CFTypeRef drawableRef) {
 	}
 }
 
-static void presentDrawable(CFTypeRef queueRef, CFTypeRef drawableRef) {
-	@autoreleasepool {
-		id<MTLDrawable> drawable = (__bridge id<MTLDrawable>)drawableRef;
-		id<MTLCommandQueue> queue = (__bridge id<MTLCommandQueue>)queueRef;
-		id<MTLCommandBuffer> cmdBuffer = [queue commandBuffer];
-		[cmdBuffer presentDrawable:drawable];
-		[cmdBuffer commit];
-		[cmdBuffer waitUntilCompleted];
-	}
-}
-
 static CFTypeRef newCommandQueue(CFTypeRef devRef) {
 	@autoreleasepool {
 		id<MTLDevice> dev = (__bridge id<MTLDevice>)devRef;
@@ -124,7 +113,8 @@ func (c *mtlContext) RenderTarget() gpu.RenderTarget {
 		panic("metal: CADrawable.texture is nil")
 	}
 	return gpu.MetalRenderTarget{
-		Texture: unsafe.Pointer(c.texture),
+		Texture:  unsafe.Pointer(c.texture),
+		Drawable: unsafe.Pointer(c.drawable),
 	}
 }
 
@@ -152,7 +142,6 @@ func (c *mtlContext) Release() {
 func (c *mtlContext) Present() error {
 	C.CFRelease(c.texture)
 	c.texture = 0
-	C.presentDrawable(c.queue, c.drawable)
 	C.CFRelease(c.drawable)
 	c.drawable = 0
 	return nil

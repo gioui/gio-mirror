@@ -72,6 +72,14 @@ static CFTypeRef cmdBufferBlitEncoder(CFTypeRef cmdBufRef) {
 	}
 }
 
+static void cmdBufferPresentDrawable(CFTypeRef cmdBufRef, CFTypeRef drawableRef) {
+	@autoreleasepool {
+		id<MTLCommandBuffer> cmdBuf = (__bridge id<MTLCommandBuffer>)cmdBufRef;
+		id<MTLDrawable> drawable = (__bridge id<MTLDrawable>)drawableRef;
+		[cmdBuf presentDrawable:drawable];
+	}
+}
+
 static void renderEncEnd(CFTypeRef renderEncRef) {
 	@autoreleasepool {
 		id<MTLRenderCommandEncoder> enc = (__bridge id<MTLRenderCommandEncoder>)renderEncRef;
@@ -442,9 +450,10 @@ type Pipeline struct {
 }
 
 type Framebuffer struct {
-	backend *Backend
-	texture C.CFTypeRef
-	foreign bool
+	backend  *Backend
+	texture  C.CFTypeRef
+	drawable C.CFTypeRef
+	foreign  bool
 }
 
 type Buffer struct {
@@ -494,13 +503,12 @@ func (b *Backend) BeginFrame(target driver.RenderTarget, clear bool, viewport im
 	if target == nil {
 		return nil
 	}
-	var texture C.CFTypeRef
 	switch t := target.(type) {
 	case driver.MetalRenderTarget:
-		texture = C.CFTypeRef(t.Texture)
-		return &Framebuffer{texture: texture, foreign: true}
+		texture := C.CFTypeRef(t.Texture)
+		drawable := C.CFTypeRef(t.Drawable)
+		return &Framebuffer{texture: texture, drawable: drawable, foreign: true}
 	case *Framebuffer:
-		texture = C.CFTypeRef(t.texture)
 		return t
 	default:
 		panic(fmt.Sprintf("metal: unsupported render target type: %T", t))
@@ -966,6 +974,9 @@ func (b *Backend) beginPass() C.CFTypeRef {
 		act = C.MTLLoadActionDontCare
 	}
 	b.ensureCmdBuffer()
+	if d := r.framebuffer.drawable; d != 0 {
+		C.cmdBufferPresentDrawable(b.cmdBuffer, d)
+	}
 	c := r.clearColor
 	b.renderEnc = C.cmdBufferRenderEncoder(b.cmdBuffer, r.framebuffer.texture, act, C.float(c[0]), C.float(c[1]), C.float(c[2]), C.float(c[3]))
 	if b.renderEnc == 0 {
