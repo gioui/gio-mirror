@@ -262,6 +262,12 @@ func (f *Functions) GetBindingi(pname Enum, idx int) Object {
 	return Object(obj)
 }
 func (f *Functions) GetInteger(pname Enum) int {
+	if !f.isWebGL2 {
+		switch pname {
+		case PACK_ROW_LENGTH, UNPACK_ROW_LENGTH:
+			return 0 // PACK_ROW_LENGTH and UNPACK_ROW_LENGTH is only available on WebGL 2
+		}
+	}
 	return paramVal(f.Ctx.Call("getParameter", int(pname)))
 }
 func (f *Functions) GetFloat(pname Enum) float32 {
@@ -351,6 +357,12 @@ func (f *Functions) LinkProgram(p Program) {
 	f.Ctx.Call("linkProgram", js.Value(p))
 }
 func (f *Functions) PixelStorei(pname Enum, param int) {
+	if !f.isWebGL2 {
+		switch pname {
+		case PACK_ROW_LENGTH, UNPACK_ROW_LENGTH:
+			return // PACK_ROW_LENGTH and UNPACK_ROW_LENGTH is only available on WebGL 2
+		}
+	}
 	f.Ctx.Call("pixelStorei", int(pname), param)
 }
 func (f *Functions) MemoryBarrier(barriers Enum) {
