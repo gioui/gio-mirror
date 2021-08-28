@@ -518,28 +518,7 @@ func (w *window) readClipboard() error {
 func (w *window) Option(opts *Options) {
 	w.opts = opts
 	if o := opts.Size; o != nil {
-		dpi := windows.GetSystemDPI()
-		cfg := configForDPI(dpi)
-		width := int32(cfg.Px(o.Width))
-		height := int32(cfg.Px(o.Height))
-
-		// Include the window decorations.
-		wr := windows.Rect{
-			Right:  width,
-			Bottom: height,
-		}
-		dwStyle := uint32(windows.WS_OVERLAPPEDWINDOW)
-		dwExStyle := uint32(windows.WS_EX_APPWINDOW | windows.WS_EX_WINDOWEDGE)
-		windows.AdjustWindowRectEx(&wr, dwStyle, 0, dwExStyle)
-
-		dw, dh := width, height
-		width = wr.Right - wr.Left
-		height = wr.Bottom - wr.Top
-		w.deltas.width = width - dw
-		w.deltas.height = height - dh
-
-		w.opts.Size = o
-		windows.MoveWindow(w.hwnd, 0, 0, width, height, true)
+		w.SetWindowLayout(opts)
 	}
 	if o := opts.MinSize; o != nil {
 		w.opts.MinSize = o
@@ -553,6 +532,49 @@ func (w *window) Option(opts *Options) {
 	if o := opts.WindowMode; o != nil {
 		w.SetWindowMode(*o)
 	}
+}
+
+//SetWindowLayout set size and position of window
+func (w *window) SetWindowLayout(opts *Options) {
+	dpi := windows.GetSystemDPI()
+	cfg := configForDPI(dpi)
+
+	width := int32(cfg.Px(opts.Size.Width))
+	height := int32(cfg.Px(opts.Size.Height))
+
+	// Include the window decorations.
+	wr := windows.Rect{
+		Right:  width,
+		Bottom: height,
+	}
+	dwStyle := uint32(windows.WS_OVERLAPPEDWINDOW)
+	dwExStyle := uint32(windows.WS_EX_APPWINDOW | windows.WS_EX_WINDOWEDGE)
+	windows.AdjustWindowRectEx(&wr, dwStyle, 0, dwExStyle)
+
+	dw, dh := width, height
+	width = wr.Right - wr.Left
+	height = wr.Bottom - wr.Top
+	w.deltas.width = width - dw
+	w.deltas.height = height - dh
+
+	w.opts.Size = opts.Size
+	if opts.Centered {
+		w.CenterWindow(width, height)
+	} else {
+		w.MoveWindowToTopLeft(width, height)
+	}
+}
+
+func (w *window) MoveWindowToTopLeft(width, height int32) {
+	windows.MoveWindow(w.hwnd, 0, 0, width, height, true)
+}
+
+func (w *window) CenterWindow(width, height int32) {
+	screenWidth := int32(windows.GetSystemMetrics(w.hwnd, windows.SM_CXSCREEN))
+	screenHeight := int32(windows.GetSystemMetrics(w.hwnd, windows.SM_CYSCREEN))
+	x := screenWidth/2 - width/2
+	y := screenHeight/2 - height/2
+	windows.MoveWindow(w.hwnd, x, y, width, height, true)
 }
 
 func (w *window) SetWindowMode(mode WindowMode) {

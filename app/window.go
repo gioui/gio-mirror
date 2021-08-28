@@ -591,6 +591,13 @@ func Title(t string) Option {
 	}
 }
 
+// Centered set the centered position of the VM
+func Centered(c bool) Option {
+	return func(opts *wm.Options) {
+		opts.Centered = c
+	}
+}
+
 // Size sets the size of the wm.
 func Size(w, h unit.Value) Option {
 	if w.V <= 0 {

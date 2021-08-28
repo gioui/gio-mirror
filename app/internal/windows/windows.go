@@ -106,6 +106,9 @@ const (
 	SIZE_MINIMIZED = 1
 	SIZE_RESTORED  = 0
 
+	SM_CXSCREEN = 0
+	SM_CYSCREEN = 1
+
 	SW_SHOWDEFAULT = 10
 
 	SWP_FRAMECHANGED  = 0x0020
@@ -265,6 +268,7 @@ var (
 	_GetMessage                  = user32.NewProc("GetMessageW")
 	_GetMessageTime              = user32.NewProc("GetMessageTime")
 	_GetMonitorInfo              = user32.NewProc("GetMonitorInfoW")
+	_GetSystemMetrics            = user32.NewProc("GetSystemMetrics")
 	_GetWindowLong               = user32.NewProc("GetWindowLongPtrW")
 	_GetWindowPlacement          = user32.NewProc("GetWindowPlacement")
 	_KillTimer                   = user32.NewProc("KillTimer")
@@ -492,6 +496,11 @@ func SetWindowPos(hwnd syscall.Handle, hwndInsertAfter uint32, x, y, dx, dy int3
 func SetWindowText(hwnd syscall.Handle, title string) {
 	wname := syscall.StringToUTF16Ptr(title)
 	_SetWindowText.Call(uintptr(hwnd), uintptr(unsafe.Pointer(wname)))
+}
+
+func GetSystemMetrics(hwnd syscall.Handle, nIndex int) (size uintptr) {
+	size, _, _ = _GetSystemMetrics.Call(uintptr(nIndex))
+	return size
 }
 
 func GlobalAlloc(size int) (syscall.Handle, error) {
