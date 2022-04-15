@@ -800,7 +800,7 @@ func (w *Window) processEvent(d driver, e event.Event) {
 		}
 		w.viewport = viewport
 		size := e2.Size // save the initial window size as the decorations will change it.
-		e2.FrameEvent.Size = w.decorate(d, e2.FrameEvent, wrapper)
+		e2.FrameEvent.Size, e2.FrameEvent.DecorationSize = w.decorate(d, e2.FrameEvent, wrapper)
 		w.out <- e2.FrameEvent
 		frame := w.waitFrame(d)
 		var signal chan<- struct{}
@@ -840,6 +840,7 @@ func (w *Window) processEvent(d driver, e event.Event) {
 			w.decorations.size = image.Point{}
 		}
 		e2.Config.Size = e2.Config.Size.Sub(w.decorations.size)
+		e2.Config.DecorationSize = w.decorations.size
 		w.out <- e2
 	case event.Event:
 		// Convert tab or shift+tab presses to focus moves.
@@ -911,9 +912,9 @@ func (w *Window) fallbackDecorate() bool {
 }
 
 // decorate the window if enabled and returns the corresponding Insets.
-func (w *Window) decorate(d driver, e system.FrameEvent, o *op.Ops) image.Point {
+func (w *Window) decorate(d driver, e system.FrameEvent, o *op.Ops) (image.Point, image.Point) {
 	if !w.fallbackDecorate() {
-		return e.Size
+		return e.Size, image.Point{}
 	}
 	theme := w.decorations.Theme
 	if theme == nil {
@@ -961,13 +962,15 @@ func (w *Window) decorate(d driver, e system.FrameEvent, o *op.Ops) image.Point 
 	size := image.Point{Y: dims.Size.Y}
 	op.Offset(f32.Point{Y: float32(size.Y)}).Add(o)
 	appSize := e.Size.Sub(size)
+	decSize := w.decorations.size
 	if w.decorations.size != size {
 		w.decorations.size = size
 		cnf := w.decorations.Config
 		cnf.Size = appSize
+		cnf.DecorationSize = decSize
 		w.out <- ConfigEvent{Config: cnf}
 	}
-	return appSize
+	return appSize, decSize
 }
 
 // Perform the actions on the window.

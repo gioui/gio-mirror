@@ -23,6 +23,8 @@ var errOutOfDate = errors.New("app: GPU surface out of date")
 type Config struct {
 	// Size is the window dimensions (Width, Height).
 	Size image.Point
+	// Decoration size is the dimensions of the window's decoration.
+	DecorationSize image.Point
 	// MaxSize is the window maximum allowed dimensions.
 	MaxSize image.Point
 	// MinSize is the window minimum allowed dimensions.

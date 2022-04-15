@@ -24,6 +24,8 @@ type FrameEvent struct {
 	Metric unit.Metric
 	// Size is the dimensions of the window.
 	Size image.Point
+	// Decoration size is the dimensions of the window's decoration.
+	DecorationSize image.Point
 	// Insets is the insets to apply.
 	Insets Insets
 	// Frame completes the FrameEvent by drawing the graphical operations
