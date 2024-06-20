@@ -407,6 +407,7 @@ CFTypeRef gio_createView(void) {
 												 selector:@selector(applicationDidHide:)
 													 name:NSApplicationDidHideNotification
 												   object:nil];
+
 		return CFBridgingRetain(view);
 	}
 }
@@ -423,6 +424,11 @@ void gio_viewSetHandle(CFTypeRef viewRef, uintptr_t handle) {
 	[NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
 	[NSApp activateIgnoringOtherApps:YES];
 	gio_onFinishLaunching();
+}
+- (void)application:(NSApplication *)application openURLs:(NSArray<NSURL *> *)urls {
+	for (NSURL *url in urls) {
+		gio_onOpenURI((__bridge CFTypeRef)url.absoluteString);
+	}
 }
 @end
 

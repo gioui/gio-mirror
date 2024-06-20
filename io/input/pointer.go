@@ -76,6 +76,7 @@ type pointerFilter struct {
 
 	sourceMimes []string
 	targetMimes []string
+	scheme      []string
 }
 
 type areaOp struct {
@@ -295,6 +296,14 @@ func (p *pointerFilter) Add(f event.Filter) {
 			}
 		}
 		p.targetMimes = append(p.targetMimes, f.Type)
+	case transfer.URLFilter:
+		for _, m := range p.scheme {
+			if m == f.Scheme {
+				return
+			}
+		}
+		p.scheme = append(p.scheme, f.Scheme)
+
 	case pointer.Filter:
 		p.kinds = p.kinds | f.Kinds
 		p.scrollX = p.scrollX.Union(f.ScrollX)
@@ -320,6 +329,12 @@ func (p *pointerFilter) Matches(e event.Event) bool {
 				return true
 			}
 		}
+	case transfer.URLEvent:
+		for _, t := range p.scheme {
+			if t == "" || t == e.URL.Scheme {
+				return true
+			}
+		}
 	}
 	return false
 }
@@ -330,6 +345,7 @@ func (p *pointerFilter) Merge(p2 pointerFilter) {
 	p.scrollY = p.scrollY.Union(p2.scrollY)
 	p.sourceMimes = append(p.sourceMimes, p2.sourceMimes...)
 	p.targetMimes = append(p.targetMimes, p2.targetMimes...)
+	p.scheme = append(p.scheme, p2.scheme...)
 }
 
 // clampScroll splits a scroll distance in the remaining scroll and the

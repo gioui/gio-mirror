@@ -12,6 +12,7 @@ import android.app.Fragment;
 import android.app.FragmentManager;
 import android.app.FragmentTransaction;
 import android.content.Context;
+import android.content.Intent;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Matrix;
@@ -311,6 +312,15 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 		window.setAttributes(layoutParams);
 	}
 
+	protected void onIntentEvent(Intent intent) {
+		if (intent == null) {
+			return;
+		}
+		if (intent.getData() != null) {
+			this.onOpenURI(nhandle, intent.getData().toString());
+		}
+	}
+
 	@Override protected boolean dispatchHoverEvent(MotionEvent event) {
 		if (!accessManager.isTouchExplorationEnabled()) {
 			return super.dispatchHoverEvent(event);
@@ -549,6 +559,7 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 	static private native void onExitTouchExploration(long handle);
 	static private native void onA11yFocus(long handle, int viewId);
 	static private native void onClearA11yFocus(long handle, int viewId);
+	static private native void onOpenURI(long handle, String uri);
 	static private native void imeSetSnippet(long handle, int start, int end);
 	static private native String imeSnippet(long handle);
 	static private native int imeSnippetStart(long handle);

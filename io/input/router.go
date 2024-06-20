@@ -214,6 +214,8 @@ func (q *Router) Event(filters ...event.Filter) (event.Event, bool) {
 			t = f.Target
 		case transfer.TargetFilter:
 			t = f.Target
+		case transfer.URLFilter:
+			t = q // See comment in processEvent.
 		case key.FocusFilter:
 			t = f.Target
 		case pointer.Filter:
@@ -398,6 +400,8 @@ func (f *filter) Add(flt event.Filter) {
 		f.pointer.Add(flt)
 	case transfer.SourceFilter, transfer.TargetFilter:
 		f.pointer.Add(flt)
+	case transfer.URLFilter:
+		f.pointer.Add(flt)
 	}
 }
 
@@ -421,6 +425,7 @@ func (f *filter) Reset() {
 		pointer: pointerFilter{
 			sourceMimes: f.pointer.sourceMimes[:0],
 			targetMimes: f.pointer.targetMimes[:0],
+			scheme:      f.pointer.scheme[:0],
 		},
 	}
 }
@@ -462,6 +467,10 @@ func (q *Router) processEvent(e event.Event, system bool) {
 	case transfer.DataEvent:
 		cstate, evts := q.cqueue.Push(state.clipboardState, e)
 		state.clipboardState = cstate
+		q.changeState(e, state, evts)
+	case transfer.URLEvent:
+		var evts []taggedEvent
+		evts = append(evts, taggedEvent{tag: q, event: e})
 		q.changeState(e, state, evts)
 	default:
 		panic("unknown event type")

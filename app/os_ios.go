@@ -82,6 +82,7 @@ import "C"
 import (
 	"image"
 	"io"
+	"net/url"
 	"os"
 	"runtime"
 	"runtime/cgo"
@@ -121,6 +122,13 @@ type window struct {
 
 var mainWindow = newWindowRendezvous()
 
+// activeViews is the list of active views.
+var activeViews = make([]*window, 0, 1)
+
+// startupURI is the URI to open when the first window is created,
+// but no window is active yet.
+var startupURI *url.URL
+
 func init() {
 	// Darwin requires UI operations happen on the main thread only.
 	runtime.LockOSThread()
@@ -145,8 +153,13 @@ func onCreate(view, controller C.CFTypeRef) {
 	}
 	w.displayLink = dl
 	C.gio_viewSetHandle(view, C.uintptr_t(cgo.NewHandle(w)))
+	activeViews = append(activeViews, w)
 	w.Configure(wopts.options)
 	w.ProcessEvent(UIKitViewEvent{ViewController: uintptr(controller)})
+	if startupURI != nil {
+		w.ProcessEvent(transfer.URLEvent{URL: startupURI})
+		startupURI = nil
+	}
 }
 
 func viewFor(h C.uintptr_t) *window {
@@ -213,6 +226,12 @@ func onDestroy(h C.uintptr_t) {
 	w.displayLink.Close()
 	w.displayLink = nil
 	cgo.Handle(h).Delete()
+	for i, v := range activeViews {
+		if v == w {
+			activeViews = append(activeViews[:i], activeViews[i+1:]...)
+			break
+		}
+	}
 	w.view = 0
 }
 
@@ -422,6 +441,21 @@ func osMain() {
 		panic("app.Main may be called only once")
 	case mainModeLibrary:
 		// Do nothing, we're embedded as a library.
+	}
+}
+
+//export gio_onOpenURI
+func gio_onOpenURI(uri C.CFTypeRef) {
+	u, err := url.Parse(nsstringToString(uri))
+	if err != nil {
+		return
+	}
+	if len(activeViews) == 0 {
+		startupURI = u
+		return
+	}
+	for _, w := range activeViews {
+		w.ProcessEvent(transfer.URLEvent{URL: u})
 	}
 }
 

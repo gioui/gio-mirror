@@ -103,6 +103,11 @@ CGFloat _keyboardHeight;
 	_keyboardHeight = 0.0;
 	[self.view setNeedsLayout];
 }
+
+- (BOOL)onOpenURI:(NSString *)url {
+    gio_onOpenURI((__bridge CFTypeRef)url);
+    return YES;
+}
 #endif
 @end
 
@@ -283,15 +288,19 @@ void gio_viewSetHandle(CFTypeRef viewRef, uintptr_t handle) {
 
 @interface _gioAppDelegate : UIResponder <UIApplicationDelegate>
 @property (strong, nonatomic) UIWindow *window;
+@property (strong, nonatomic) GioViewController *controller;
 @end
 
 @implementation _gioAppDelegate
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
 	self.window = [[UIWindow alloc] initWithFrame:[[UIScreen mainScreen] bounds]];
-	GioViewController *controller = [[GioViewController alloc] initWithNibName:nil bundle:nil];
-	self.window.rootViewController = controller;
+	self.controller = [[GioViewController alloc] initWithNibName:nil bundle:nil];
+	self.window.rootViewController = self.controller;
 	[self.window makeKeyAndVisible];
 	return YES;
+}
+- (BOOL)application:(UIApplication *)app openURL:(NSURL *)url options:(NSDictionary<UIApplicationOpenURLOptionsKey, id> *)options {
+	return [self.controller onOpenURI:url.absoluteString];
 }
 @end
 

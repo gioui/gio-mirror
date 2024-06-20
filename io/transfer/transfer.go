@@ -19,6 +19,7 @@ package transfer
 
 import (
 	"io"
+	"net/url"
 
 	"gioui.org/io/event"
 )
@@ -57,6 +58,14 @@ type TargetFilter struct {
 	Type string
 }
 
+// URLFilter filters for [URLEvent].
+type URLFilter struct {
+	// Scheme must equal the URLEvent scheme to match. The empty Scheme matches all URLEvents.
+	Scheme string
+}
+
+func (URLFilter) ImplementsFilter() {}
+
 // RequestEvent requests data from a data source. The source must
 // respond with an OfferCmd.
 type RequestEvent struct {
@@ -90,6 +99,22 @@ type DataEvent struct {
 }
 
 func (DataEvent) ImplementsEvent() {}
+
+// URLEvent is generated when the program is invoked with a URL. It is matched
+// by [URLFilter].
+//
+// In order to receive the program must register a scheme. The scheme can be registered
+// using gogio, with the `-schemes` flag.
+//
+// Due to differences between OSes, URLEvent might not be generated when the URL is
+// larger than 2048 characters. Domain names using non-ASCII characters have
+// undefined behavior, it can be either encoded as Punycode, QueryEscape,
+// or even as raw UTF-8.
+type URLEvent struct {
+	URL *url.URL
+}
+
+func (URLEvent) ImplementsEvent() {}
 
 func (SourceFilter) ImplementsFilter() {}
 func (TargetFilter) ImplementsFilter() {}

@@ -4,6 +4,7 @@ package org.gioui;
 
 import android.app.Activity;
 import android.os.Bundle;
+import android.content.Intent;
 import android.content.res.Configuration;
 import android.view.ViewGroup;
 import android.view.View;
@@ -29,6 +30,7 @@ public final class GioActivity extends Activity {
 
             layer.addView(view);
             setContentView(layer);
+            onNewIntent(this.getIntent());
 	}
 
 	@Override public void onDestroy() {
@@ -59,5 +61,10 @@ public final class GioActivity extends Activity {
 	@Override public void onBackPressed() {
 		if (!view.backPressed())
 			super.onBackPressed();
+	}
+
+	@Override protected void onNewIntent(Intent intent) {
+		super.onNewIntent(intent);
+		view.onIntentEvent(intent);
 	}
 }

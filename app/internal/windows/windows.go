@@ -108,6 +108,12 @@ type MonitorInfo struct {
 	Flags    uint32
 }
 
+type CopyDataStruct struct {
+	DwData uintptr
+	CbData uint32
+	LpData uintptr
+}
+
 const (
 	TRUE = 1
 
@@ -247,6 +253,7 @@ const (
 	WM_CANCELMODE           = 0x001F
 	WM_CHAR                 = 0x0102
 	WM_CLOSE                = 0x0010
+	WM_COPYDATA             = 0x004A
 	WM_CREATE               = 0x0001
 	WM_DPICHANGED           = 0x02E0
 	WM_DESTROY              = 0x0002
@@ -344,6 +351,7 @@ var (
 	_DefWindowProc               = user32.NewProc("DefWindowProcW")
 	_DestroyWindow               = user32.NewProc("DestroyWindow")
 	_DispatchMessage             = user32.NewProc("DispatchMessageW")
+	_FindWindow                  = user32.NewProc("FindWindowW")
 	_EmptyClipboard              = user32.NewProc("EmptyClipboard")
 	_GetWindowRect               = user32.NewProc("GetWindowRect")
 	_GetClientRect               = user32.NewProc("GetClientRect")
@@ -374,6 +382,7 @@ var (
 	_ReleaseDC                   = user32.NewProc("ReleaseDC")
 	_ScreenToClient              = user32.NewProc("ScreenToClient")
 	_ShowWindow                  = user32.NewProc("ShowWindow")
+	_SendMessage                 = user32.NewProc("SendMessageW")
 	_SetCapture                  = user32.NewProc("SetCapture")
 	_SetCursor                   = user32.NewProc("SetCursor")
 	_SetClipboardData            = user32.NewProc("SetClipboardData")
@@ -471,6 +480,14 @@ func EmptyClipboard() error {
 		return fmt.Errorf("EmptyClipboard: %v", err)
 	}
 	return nil
+}
+
+func FindWindow(lpClassName string) (syscall.Handle, error) {
+	hwnd, _, err := _FindWindow.Call(uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(lpClassName))), 0)
+	if hwnd == 0 {
+		return 0, fmt.Errorf("FindWindow failed: %v", err)
+	}
+	return syscall.Handle(hwnd), nil
 }
 
 func GetWindowRect(hwnd syscall.Handle) Rect {
@@ -778,6 +795,14 @@ func RegisterClassEx(cls *WndClassEx) (uint16, error) {
 
 func ReleaseDC(hdc syscall.Handle) {
 	_ReleaseDC.Call(uintptr(hdc))
+}
+
+func SendMessage(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) error {
+	r, _, err := _SendMessage.Call(uintptr(hwnd), uintptr(msg), wParam, lParam)
+	if r == 0 {
+		return fmt.Errorf("SendMessage failed: %v", err)
+	}
+	return nil
 }
 
 func SetForegroundWindow(hwnd syscall.Handle) {
