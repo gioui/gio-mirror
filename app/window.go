@@ -963,6 +963,20 @@ func Decorated(enabled bool) Option {
 	}
 }
 
+// HiddenMinimizeButton controls whether show minimize button on macos and windows
+func HiddenMinimizeButton(hidden bool) Option {
+	return func(_ unit.Metric, cnf *Config) {
+		cnf.HiddenMinimizeButton = hidden
+	}
+}
+
+// HiddenMaximizeButton controls whether show maximize button on macos and windows
+func HiddenMaximizeButton(hidden bool) Option {
+	return func(_ unit.Metric, cnf *Config) {
+		cnf.HiddenMaximizeButton = hidden
+	}
+}
+
 // flushEvent is sent to detect when the user program
 // has completed processing of all prior events. Its an
 // [io/event.Event] but only for internal use.

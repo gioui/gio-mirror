@@ -445,6 +445,14 @@ func (w *window) Configure(options []Option) {
 			C.setMaxSize(window, C.CGFloat(cnf.MaxSize.X), C.CGFloat(cnf.MaxSize.Y))
 		}
 	}
+	if cnf.Decorated != prev.Decorated || cnf.HiddenMinimizeButton != prev.HiddenMinimizeButton {
+		hidden := toInt(!cnf.Decorated || cnf.HiddenMinimizeButton)
+		C.setWindowStandardButtonHidden(window, C.NSWindowMiniaturizeButton, hidden)
+	}
+	if cnf.Decorated != prev.Decorated || cnf.HiddenMaximizeButton != prev.HiddenMaximizeButton {
+		hidden := toInt(!cnf.Decorated || cnf.HiddenMaximizeButton)
+		C.setWindowStandardButtonHidden(window, C.NSWindowZoomButton, hidden)
+	}
 	if cnf.Decorated != prev.Decorated {
 		w.config.Decorated = cnf.Decorated
 		mask := C.getWindowStyleMask(window)
@@ -458,12 +466,11 @@ func (w *window) Configure(options []Option) {
 			barTrans = C.YES
 			titleVis = C.NSWindowTitleHidden
 		}
+
 		C.setWindowTitlebarAppearsTransparent(window, barTrans)
 		C.setWindowTitleVisibility(window, titleVis)
 		C.setWindowStyleMask(window, mask)
 		C.setWindowStandardButtonHidden(window, C.NSWindowCloseButton, barTrans)
-		C.setWindowStandardButtonHidden(window, C.NSWindowMiniaturizeButton, barTrans)
-		C.setWindowStandardButtonHidden(window, C.NSWindowZoomButton, barTrans)
 		// When toggling the titlebar, the layer doesn't update its frame
 		// until the next resize. Force it.
 		C.resetLayerFrame(w.view)
@@ -1070,6 +1077,14 @@ func convertMods(mods C.NSUInteger) key.Modifiers {
 		kmods |= key.ModShift
 	}
 	return kmods
+}
+
+// toInt golang bool to C.int
+func toInt(v bool) C.int {
+	if v {
+		return C.int(C.YES)
+	}
+	return C.int(C.NO)
 }
 
 func (AppKitViewEvent) implementsViewEvent() {}
