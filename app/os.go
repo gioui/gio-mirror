@@ -46,9 +46,9 @@ type Config struct {
 	// Decorated reports whether window decorations are provided automatically.
 	Decorated bool
 
-	// HiddenMinimizeButton hide the window's minimize button
+	// HiddenMinimizeButton hide the window's minimize button (only works for windows and macOS)
 	HiddenMinimizeButton bool
-	// HiddenMaximizeButton hide the window's maximize button
+	// HiddenMaximizeButton hide the window's maximize button (only works for windows and macOS)
 	HiddenMaximizeButton bool
 
 	// Focused reports whether has the keyboard focus.
