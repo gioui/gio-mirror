@@ -1393,6 +1393,10 @@ func (w *window) ProcessEvent(e event.Event) {
 	w.w.ProcessEvent(e)
 }
 
+func (w *window) DriverName() string {
+	return "wayland"
+}
+
 func (w *window) Event() event.Event {
 	for {
 		evt, ok := w.w.nextEvent()

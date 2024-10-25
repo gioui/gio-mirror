@@ -679,6 +679,10 @@ func (w *window) processEvent(e event.Event) bool {
 	return true
 }
 
+func (w *window) DriverName() string {
+	return "android"
+}
+
 func (w *window) Event() event.Event {
 	return w.loop.Event()
 }

@@ -182,6 +182,8 @@ type context interface {
 // driver is the interface for the platform implementation
 // of a window.
 type driver interface {
+	// DriverName get driver anme
+	DriverName() string
 	// Event blocks until an event is available and returns it.
 	Event() event.Event
 	// Invalidate requests a FrameEvent.

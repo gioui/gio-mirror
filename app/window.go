@@ -272,6 +272,14 @@ func (w *Window) updateState() {
 	w.updateAnimation()
 }
 
+// DriverName get driver name
+func (w *Window) DriverName() string {
+	if w.driver == nil {
+		return ""
+	}
+	return w.driver.DriverName()
+}
+
 // Invalidate the window such that a [FrameEvent] will be generated immediately.
 // If the window is inactive, an unspecified event is sent instead.
 //

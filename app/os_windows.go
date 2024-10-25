@@ -606,6 +606,10 @@ func (w *window) ProcessEvent(e event.Event) {
 	w.loop.FlushEvents()
 }
 
+func (w *window) DriverName() string {
+	return "windows"
+}
+
 func (w *window) Event() event.Event {
 	return w.loop.Event()
 }
