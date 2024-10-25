@@ -5,6 +5,7 @@ package layout
 import (
 	"time"
 
+	"gioui.org/io/event"
 	"gioui.org/io/input"
 	"gioui.org/io/system"
 	"gioui.org/op"
@@ -28,6 +29,7 @@ type Context struct {
 	// Interested users must look up and populate these values manually.
 	Locale system.Locale
 
+	disabled bool
 	input.Source
 	*op.Ops
 }
@@ -42,9 +44,21 @@ func (c Context) Sp(v unit.Sp) int {
 	return c.Metric.Sp(v)
 }
 
-// Disabled returns a copy of this context with a disabled Source,
-// blocking widgets from changing its state and receiving events.
+func (c Context) Event(filters ...event.Filter) (event.Event, bool) {
+	if c.disabled {
+		return nil, false
+	}
+	return c.Source.Event(filters...)
+}
+
+// Enabled reports whether this context is enabled. Disabled contexts
+// don't report events.
+func (c Context) Enabled() bool {
+	return !c.disabled
+}
+
+// Disabled returns a copy of this context that don't deliver any events.
 func (c Context) Disabled() Context {
-	c.Source = input.Source{}
+	c.disabled = true
 	return c
 }

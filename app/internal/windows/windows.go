@@ -266,7 +266,6 @@ const (
 	WM_MOUSEWHEEL           = 0x020A
 	WM_MOUSEHWHEEL          = 0x020E
 	WM_NCACTIVATE           = 0x0086
-	WM_NCLBUTTONDBLCLK      = 0x00A3
 	WM_NCHITTEST            = 0x0084
 	WM_NCCALCSIZE           = 0x0083
 	WM_PAINT                = 0x000F
@@ -275,6 +274,7 @@ const (
 	WM_SETFOCUS             = 0x0007
 	WM_SHOWWINDOW           = 0x0018
 	WM_SIZE                 = 0x0005
+	WM_STYLECHANGED         = 0x007D
 	WM_SYSKEYDOWN           = 0x0104
 	WM_SYSKEYUP             = 0x0105
 	WM_RBUTTONDOWN          = 0x0204

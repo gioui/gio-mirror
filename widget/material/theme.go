@@ -32,6 +32,9 @@ type Palette struct {
 	ContrastFg color.NRGBA
 }
 
+// Theme holds the general theme of an app or window. Different top-level
+// windows should have different instances of Theme (with different Shapers;
+// see the godoc for [text.Shaper]), though their other fields can be equal.
 type Theme struct {
 	Shaper *text.Shaper
 	Palette

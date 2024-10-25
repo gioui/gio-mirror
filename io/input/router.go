@@ -60,7 +60,7 @@ type Router struct {
 }
 
 // Source implements the interface between a Router and user interface widgets.
-// The value Source is disabled.
+// The zero-value Source is disabled.
 type Source struct {
 	r *Router
 }
@@ -171,22 +171,22 @@ func (q *Router) Source() Source {
 
 // Execute a command.
 func (s Source) Execute(c Command) {
-	if !s.Enabled() {
+	if !s.enabled() {
 		return
 	}
 	s.r.execute(c)
 }
 
-// Enabled reports whether the source is enabled. Only enabled
+// enabled reports whether the source is enabled. Only enabled
 // Sources deliver events and respond to commands.
-func (s Source) Enabled() bool {
+func (s Source) enabled() bool {
 	return s.r != nil
 }
 
 // Focused reports whether tag is focused, according to the most recent
 // [key.FocusEvent] delivered.
 func (s Source) Focused(tag event.Tag) bool {
-	if !s.Enabled() {
+	if !s.enabled() {
 		return false
 	}
 	return s.r.state().keyState.focus == tag
@@ -194,7 +194,7 @@ func (s Source) Focused(tag event.Tag) bool {
 
 // Event returns the next event that matches at least one of filters.
 func (s Source) Event(filters ...event.Filter) (event.Event, bool) {
-	if !s.Enabled() {
+	if !s.enabled() {
 		return nil, false
 	}
 	return s.r.Event(filters...)

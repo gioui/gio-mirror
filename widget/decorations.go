@@ -11,8 +11,11 @@ import (
 
 // Decorations handles the states of window decorations.
 type Decorations struct {
+	// Maximized controls the look and behaviour of the maximize
+	// button. It is the user's responsibility to set Maximized
+	// according to the window state reported through [app.ConfigEvent].
+	Maximized bool
 	clicks    map[int]*Clickable
-	maximized bool
 }
 
 // LayoutMove lays out the widget that makes a window movable.
@@ -40,17 +43,6 @@ func (d *Decorations) Clickable(action system.Action) *Clickable {
 	return click
 }
 
-// Perform updates the decorations as if the specified actions were
-// performed by the user.
-func (d *Decorations) Perform(actions system.Action) {
-	if actions&system.ActionMaximize != 0 {
-		d.maximized = true
-	}
-	if actions&(system.ActionUnmaximize|system.ActionMinimize|system.ActionFullscreen) != 0 {
-		d.maximized = false
-	}
-}
-
 // Update the state and return the set of actions activated by the user.
 func (d *Decorations) Update(gtx layout.Context) system.Action {
 	var actions system.Action
@@ -60,21 +52,12 @@ func (d *Decorations) Update(gtx layout.Context) system.Action {
 		}
 		action := system.Action(1 << idx)
 		switch {
-		case action == system.ActionMaximize && d.maximized:
+		case action == system.ActionMaximize && d.Maximized:
 			action = system.ActionUnmaximize
-		case action == system.ActionUnmaximize && !d.maximized:
+		case action == system.ActionUnmaximize && !d.Maximized:
 			action = system.ActionMaximize
-		}
-		switch action {
-		case system.ActionMaximize, system.ActionUnmaximize:
-			d.maximized = !d.maximized
 		}
 		actions |= action
 	}
 	return actions
-}
-
-// Maximized returns whether the window is maximized.
-func (d *Decorations) Maximized() bool {
-	return d.maximized
 }

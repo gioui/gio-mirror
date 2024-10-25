@@ -199,7 +199,15 @@ func (f Flags) String() string {
 
 type GlyphID uint64
 
-// Shaper converts strings of text into glyphs that can be displayed.
+// Shaper converts strings of text into glyphs that can be displayed. The same
+// Shaper should not be used in different goroutines.
+//
+// The Shaper controls text layout and has a cache, implemented as a map, and
+// so laying out text in two different goroutines can easily result in
+// concurrent access to said map, resulting in a panic.
+//
+// Practically speaking, this means you should use different Shapers for
+// different top-level windows.
 type Shaper struct {
 	config struct {
 		disableSystemFonts bool

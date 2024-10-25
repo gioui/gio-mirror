@@ -109,6 +109,14 @@ static void makeKeyAndOrderFront(CFTypeRef windowRef) {
 	}
 }
 
+static void makeFirstResponder(CFTypeRef windowRef, CFTypeRef viewRef) {
+	@autoreleasepool {
+		NSWindow *window = (__bridge NSWindow *)windowRef;
+		NSView *view = (__bridge NSView *)viewRef;
+		[window makeFirstResponder:view];
+	}
+}
+
 static void toggleFullScreen(CFTypeRef windowRef) {
 	@autoreleasepool {
 		NSWindow *window = (__bridge NSWindow *)windowRef;
@@ -238,6 +246,13 @@ static int isWindowZoomed(CFTypeRef windowRef) {
 	}
 }
 
+static int isWindowMiniaturized(CFTypeRef windowRef) {
+	@autoreleasepool {
+		NSWindow *window = (__bridge NSWindow *)windowRef;
+		return window.miniaturized ? 1 : 0;
+	}
+}
+
 static void zoomWindow(CFTypeRef windowRef) {
 	@autoreleasepool {
 		NSWindow *window = (__bridge NSWindow *)windowRef;
@@ -318,7 +333,6 @@ type window struct {
 	view        C.CFTypeRef
 	w           *callbacks
 	anim        bool
-	visible     bool
 	displayLink *displayLink
 	// redraw is a single entry channel for making sure only one
 	// display link redraw request is in flight.
@@ -367,11 +381,23 @@ func (w *window) WriteClipboard(mime string, s []byte) {
 }
 
 func (w *window) updateWindowMode() {
+	w.scale = float32(C.getViewBackingScale(w.view))
+	wf, hf := float32(C.viewWidth(w.view)), float32(C.viewHeight(w.view))
+	w.config.Size = image.Point{
+		X: int(wf*w.scale + .5),
+		Y: int(hf*w.scale + .5),
+	}
+	w.config.Mode = Windowed
+	window := C.windowForView(w.view)
+	if window == 0 {
+		return
+	}
 	style := int(C.getWindowStyleMask(C.windowForView(w.view)))
-	if style&C.NSWindowStyleMaskFullScreen != 0 {
+	switch {
+	case style&C.NSWindowStyleMaskFullScreen != 0:
 		w.config.Mode = Fullscreen
-	} else {
-		w.config.Mode = Windowed
+	case C.isWindowZoomed(window) != 0:
+		w.config.Mode = Maximized
 	}
 	w.config.Decorated = style&C.NSWindowStyleMaskFullSizeContentView == 0
 }
@@ -379,112 +405,83 @@ func (w *window) updateWindowMode() {
 func (w *window) Configure(options []Option) {
 	screenScale := float32(C.getScreenBackingScale())
 	cfg := configFor(screenScale)
-	prev := w.config
-	w.updateWindowMode()
 	cnf := w.config
 	cnf.apply(cfg, options)
 	window := C.windowForView(w.view)
 
+	mask := C.getWindowStyleMask(window)
+	fullscreen := mask&C.NSWindowStyleMaskFullScreen != 0
 	switch cnf.Mode {
 	case Fullscreen:
-		switch prev.Mode {
-		case Fullscreen:
-		case Minimized:
+		if C.isWindowMiniaturized(window) != 0 {
 			C.unhideWindow(window)
-			fallthrough
-		default:
-			w.config.Mode = Fullscreen
+		}
+		if !fullscreen {
 			C.toggleFullScreen(window)
 		}
 	case Minimized:
-		switch prev.Mode {
-		case Minimized, Fullscreen:
-		default:
-			w.config.Mode = Minimized
-			C.hideWindow(window)
-		}
+		C.hideWindow(window)
 	case Maximized:
-		switch prev.Mode {
-		case Fullscreen:
-		case Minimized:
+		if C.isWindowMiniaturized(window) != 0 {
 			C.unhideWindow(window)
-			fallthrough
-		default:
-			w.config.Mode = Maximized
-			w.setTitle(prev, cnf)
-			if C.isWindowZoomed(window) == 0 {
-				C.zoomWindow(window)
-			}
+		}
+		if fullscreen {
+			C.toggleFullScreen(window)
+		}
+		w.setTitle(cnf.Title)
+		if C.isWindowZoomed(window) == 0 {
+			C.zoomWindow(window)
 		}
 	case Windowed:
-		switch prev.Mode {
-		case Fullscreen:
-			C.toggleFullScreen(window)
-		case Minimized:
+		if C.isWindowMiniaturized(window) != 0 {
 			C.unhideWindow(window)
-		case Maximized:
-			if C.isWindowZoomed(window) != 0 {
-				C.zoomWindow(window)
-			}
 		}
-		w.config.Mode = Windowed
-		w.setTitle(prev, cnf)
-		if prev.Size != cnf.Size {
-			w.config.Size = cnf.Size
-			cnf.Size = cnf.Size.Div(int(screenScale))
-			C.setSize(window, C.CGFloat(cnf.Size.X), C.CGFloat(cnf.Size.Y))
+		if fullscreen {
+			C.toggleFullScreen(window)
 		}
-		if prev.MinSize != cnf.MinSize {
-			w.config.MinSize = cnf.MinSize
-			cnf.MinSize = cnf.MinSize.Div(int(screenScale))
-			C.setMinSize(window, C.CGFloat(cnf.MinSize.X), C.CGFloat(cnf.MinSize.Y))
-		}
-		if prev.MaxSize != cnf.MaxSize {
-			w.config.MaxSize = cnf.MaxSize
-			cnf.MaxSize = cnf.MaxSize.Div(int(screenScale))
+		w.setTitle(cnf.Title)
+		w.config.Size = cnf.Size
+		cnf.Size = cnf.Size.Div(int(screenScale))
+		C.setSize(window, C.CGFloat(cnf.Size.X), C.CGFloat(cnf.Size.Y))
+		w.config.MinSize = cnf.MinSize
+		cnf.MinSize = cnf.MinSize.Div(int(screenScale))
+		C.setMinSize(window, C.CGFloat(cnf.MinSize.X), C.CGFloat(cnf.MinSize.Y))
+		w.config.MaxSize = cnf.MaxSize
+		cnf.MaxSize = cnf.MaxSize.Div(int(screenScale))
+		if cnf.MaxSize != (image.Point{}) {
 			C.setMaxSize(window, C.CGFloat(cnf.MaxSize.X), C.CGFloat(cnf.MaxSize.Y))
 		}
-	}
-	if cnf.Decorated != prev.Decorated || cnf.HiddenMinimizeButton != prev.HiddenMinimizeButton {
-		hidden := toInt(!cnf.Decorated || cnf.HiddenMinimizeButton)
-		C.setWindowStandardButtonHidden(window, C.NSWindowMiniaturizeButton, hidden)
-	}
-	if cnf.Decorated != prev.Decorated || cnf.HiddenMaximizeButton != prev.HiddenMaximizeButton {
-		hidden := toInt(!cnf.Decorated || cnf.HiddenMaximizeButton)
-		C.setWindowStandardButtonHidden(window, C.NSWindowZoomButton, hidden)
-	}
-	if cnf.Decorated != prev.Decorated {
-		w.config.Decorated = cnf.Decorated
-		mask := C.getWindowStyleMask(window)
-		style := C.NSWindowStyleMask(C.NSWindowStyleMaskTitled | C.NSWindowStyleMaskResizable | C.NSWindowStyleMaskMiniaturizable | C.NSWindowStyleMaskClosable)
-		style = C.NSWindowStyleMaskFullSizeContentView
-		mask &^= style
-		barTrans := C.int(C.NO)
-		titleVis := C.NSWindowTitleVisibility(C.NSWindowTitleVisible)
-		if !cnf.Decorated {
-			mask |= style
-			barTrans = C.YES
-			titleVis = C.NSWindowTitleHidden
+		if C.isWindowZoomed(window) != 0 {
+			C.zoomWindow(window)
 		}
-
-		C.setWindowTitlebarAppearsTransparent(window, barTrans)
-		C.setWindowTitleVisibility(window, titleVis)
-		C.setWindowStyleMask(window, mask)
-		C.setWindowStandardButtonHidden(window, C.NSWindowCloseButton, barTrans)
-		// When toggling the titlebar, the layer doesn't update its frame
-		// until the next resize. Force it.
-		C.resetLayerFrame(w.view)
 	}
-	w.ProcessEvent(ConfigEvent{Config: w.config})
+	style := C.NSWindowStyleMask(C.NSWindowStyleMaskTitled | C.NSWindowStyleMaskResizable | C.NSWindowStyleMaskMiniaturizable | C.NSWindowStyleMaskClosable)
+	style = C.NSWindowStyleMaskFullSizeContentView
+	mask &^= style
+	barTrans := C.int(C.NO)
+	titleVis := C.NSWindowTitleVisibility(C.NSWindowTitleVisible)
+	if !cnf.Decorated {
+		mask |= style
+		barTrans = C.YES
+		titleVis = C.NSWindowTitleHidden
+	}
+	C.setWindowTitlebarAppearsTransparent(window, barTrans)
+	C.setWindowTitleVisibility(window, titleVis)
+	C.setWindowStyleMask(window, mask)
+	C.setWindowStandardButtonHidden(window, C.NSWindowCloseButton, barTrans)
+	// no decorated or hide minimize and maximize buttons
+	C.setWindowStandardButtonHidden(window, C.NSWindowMiniaturizeButton, toInt(!cnf.Decorated || cnf.HiddenMinimizeButton))
+	C.setWindowStandardButtonHidden(window, C.NSWindowZoomButton, toInt(!cnf.Decorated || cnf.HiddenMaximizeButton))
+	// When toggling the titlebar, the layer doesn't update its frame
+	// until the next resize. Force it.
+	C.resetLayerFrame(w.view)
 }
 
-func (w *window) setTitle(prev, cnf Config) {
-	if prev.Title != cnf.Title {
-		w.config.Title = cnf.Title
-		title := stringToNSString(cnf.Title)
-		defer C.CFRelease(title)
-		C.setTitle(C.windowForView(w.view), title)
-	}
+func (w *window) setTitle(title string) {
+	w.config.Title = title
+	titleC := stringToNSString(title)
+	defer C.CFRelease(titleC)
+	C.setTitle(C.windowForView(w.view), titleC)
 }
 
 func (w *window) Perform(acts system.Action) {
@@ -527,7 +524,8 @@ func (w *window) SetInputHint(_ key.InputHint) {}
 
 func (w *window) SetAnimating(anim bool) {
 	w.anim = anim
-	if w.anim && w.visible {
+	window := C.windowForView(w.view)
+	if w.anim && window != 0 {
 		w.displayLink.Start()
 	} else {
 		w.displayLink.Stop()
@@ -806,24 +804,19 @@ func gio_firstRectForCharacterRange(h C.uintptr_t, crng C.NSRange, actual C.NSRa
 }
 
 func (w *window) draw() {
+	cnf := w.config
+	w.updateWindowMode()
+	if w.config != cnf {
+		w.ProcessEvent(ConfigEvent{Config: w.config})
+	}
 	select {
 	case <-w.redraw:
 	default:
 	}
-	w.visible = true
 	if w.anim {
 		w.SetAnimating(w.anim)
 	}
-	w.scale = float32(C.getViewBackingScale(w.view))
-	wf, hf := float32(C.viewWidth(w.view)), float32(C.viewHeight(w.view))
-	sz := image.Point{
-		X: int(wf*w.scale + .5),
-		Y: int(hf*w.scale + .5),
-	}
-	if sz != w.config.Size {
-		w.config.Size = sz
-		w.ProcessEvent(ConfigEvent{Config: w.config})
-	}
+	sz := w.config.Size
 	if sz.X == 0 || sz.Y == 0 {
 		return
 	}
@@ -831,7 +824,7 @@ func (w *window) draw() {
 	w.ProcessEvent(frameEvent{
 		FrameEvent: FrameEvent{
 			Now:    time.Now(),
-			Size:   w.config.Size,
+			Size:   sz,
 			Metric: cfg,
 		},
 		Sync: true,
@@ -874,7 +867,6 @@ func gio_onAttached(h C.uintptr_t, attached C.int) {
 		w.ProcessEvent(AppKitViewEvent{View: uintptr(w.view), Layer: uintptr(layer)})
 	} else {
 		w.ProcessEvent(AppKitViewEvent{})
-		w.visible = false
 		w.SetAnimating(w.anim)
 	}
 }
@@ -887,33 +879,6 @@ func gio_onDestroy(h C.uintptr_t) {
 	w.displayLink = nil
 	cgo.Handle(h).Delete()
 	w.view = 0
-}
-
-//export gio_onHide
-func gio_onHide(h C.uintptr_t) {
-	w := windowFor(h)
-	w.visible = false
-	w.SetAnimating(w.anim)
-}
-
-//export gio_onShow
-func gio_onShow(h C.uintptr_t) {
-	w := windowFor(h)
-	w.draw()
-}
-
-//export gio_onFullscreen
-func gio_onFullscreen(h C.uintptr_t) {
-	w := windowFor(h)
-	w.config.Mode = Fullscreen
-	w.ProcessEvent(ConfigEvent{Config: w.config})
-}
-
-//export gio_onWindowed
-func gio_onWindowed(h C.uintptr_t) {
-	w := windowFor(h)
-	w.config.Mode = Windowed
-	w.ProcessEvent(ConfigEvent{Config: w.config})
 }
 
 //export gio_onFinishLaunching
@@ -938,10 +903,9 @@ func newWindow(win *callbacks, options []Option) {
 			w.ProcessEvent(DestroyEvent{Err: err})
 			return
 		}
-		window := C.gio_createWindow(w.view, 0, 0, 0, 0, 0, 0)
+		window := C.gio_createWindow(w.view, C.CGFloat(cnf.Size.X), C.CGFloat(cnf.Size.Y), 0, 0, 0, 0)
 		// Release our reference now that the NSWindow has it.
 		C.CFRelease(w.view)
-		w.updateWindowMode()
 		w.Configure(options)
 		if nextTopLeft.x == 0 && nextTopLeft.y == 0 {
 			// cascadeTopLeftFromPoint treats (0, 0) as a no-op,
@@ -949,6 +913,7 @@ func newWindow(win *callbacks, options []Option) {
 			nextTopLeft = C.cascadeTopLeftFromPoint(window, nextTopLeft)
 		}
 		nextTopLeft = C.cascadeTopLeftFromPoint(window, nextTopLeft)
+		C.makeFirstResponder(window, w.view)
 		// makeKeyAndOrderFront assumes ownership of our window reference.
 		C.makeKeyAndOrderFront(window)
 	})
@@ -973,9 +938,7 @@ func (w *window) init(customRenderer bool) error {
 			return
 		}
 		w.runOnMain(func() {
-			if w.visible {
-				C.setNeedsDisplay(w.view)
-			}
+			C.setNeedsDisplay(w.view)
 		})
 	})
 	w.displayLink = dl

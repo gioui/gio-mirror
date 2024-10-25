@@ -46,14 +46,13 @@ type window struct {
 	cursorIn bool
 	cursor   syscall.Handle
 
-	// placement saves the previous window position when in full screen mode.
-	placement *windows.WindowPlacement
-
 	animating bool
 
 	borderSize image.Point
 	config     Config
-	loop       *eventLoop
+	// frameDims stores the last seen window frame width and height.
+	frameDims image.Point
+	loop      *eventLoop
 }
 
 const _WM_WAKEUP = windows.WM_USER + iota
@@ -108,8 +107,8 @@ func newWindow(win *callbacks, options []Option) {
 		}
 		winMap.Store(w.hwnd, w)
 		defer winMap.Delete(w.hwnd)
-		w.ProcessEvent(Win32ViewEvent{HWND: uintptr(w.hwnd)})
 		w.Configure(options)
+		w.ProcessEvent(Win32ViewEvent{HWND: uintptr(w.hwnd)})
 		windows.SetForegroundWindow(w.hwnd)
 		windows.SetFocus(w.hwnd)
 		// Since the window class for the cursor is null,
@@ -185,21 +184,39 @@ func (w *window) init() error {
 	return nil
 }
 
-// update() handles changes done by the user, and updates the configuration.
+// update handles changes done by the user, and updates the configuration.
 // It reads the window style and size/position and updates w.config.
 // If anything has changed it emits a ConfigEvent to notify the application.
 func (w *window) update() {
-	cr := windows.GetClientRect(w.hwnd)
-	w.config.Size = image.Point{
-		X: int(cr.Right - cr.Left),
-		Y: int(cr.Bottom - cr.Top),
+	p := windows.GetWindowPlacement(w.hwnd)
+	if !p.IsMinimized() {
+		r := windows.GetWindowRect(w.hwnd)
+		cr := windows.GetClientRect(w.hwnd)
+		w.config.Size = image.Point{
+			X: int(cr.Right - cr.Left),
+			Y: int(cr.Bottom - cr.Top),
+		}
+		w.frameDims = image.Point{
+			X: int(r.Right - r.Left),
+			Y: int(r.Bottom - r.Top),
+		}.Sub(w.config.Size)
 	}
 
 	w.borderSize = image.Pt(
 		windows.GetSystemMetrics(windows.SM_CXSIZEFRAME),
 		windows.GetSystemMetrics(windows.SM_CYSIZEFRAME),
 	)
+	style := windows.GetWindowLong(w.hwnd, windows.GWL_STYLE)
+	switch {
+	case p.IsMaximized() && style&windows.WS_OVERLAPPEDWINDOW != 0:
+		w.config.Mode = Maximized
+	case p.IsMaximized():
+		w.config.Mode = Fullscreen
+	default:
+		w.config.Mode = Windowed
+	}
 	w.ProcessEvent(ConfigEvent{Config: w.config})
+	w.draw(true)
 }
 
 func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr {
@@ -326,45 +343,33 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 		mi := windows.GetMonitorInfo(w.hwnd)
 		szp.Rgrc[0] = mi.WorkArea
 		return 0
-	case windows.WM_NCLBUTTONDBLCLK:
-		if !w.config.Decorated {
-			// Override Windows behaviour when we
-			// draw decorations.
-			return 0
-		}
 	case windows.WM_PAINT:
 		w.draw(true)
+	case windows.WM_STYLECHANGED:
+		w.update()
+	case windows.WM_WINDOWPOSCHANGED:
+		w.update()
 	case windows.WM_SIZE:
 		w.update()
-		switch wParam {
-		case windows.SIZE_MINIMIZED:
-			w.config.Mode = Minimized
-		case windows.SIZE_MAXIMIZED:
-			w.config.Mode = Maximized
-		case windows.SIZE_RESTORED:
-			if w.config.Mode != Fullscreen {
-				w.config.Mode = Windowed
-			}
-		}
 	case windows.WM_GETMINMAXINFO:
 		mm := (*windows.MinMaxInfo)(unsafe.Pointer(lParam))
-		var bw, bh int32
+
+		var frameDims image.Point
 		if w.config.Decorated {
-			r := windows.GetWindowRect(w.hwnd)
-			cr := windows.GetClientRect(w.hwnd)
-			bw = r.Right - r.Left - (cr.Right - cr.Left)
-			bh = r.Bottom - r.Top - (cr.Bottom - cr.Top)
+			frameDims = w.frameDims
 		}
 		if p := w.config.MinSize; p.X > 0 || p.Y > 0 {
+			p = p.Add(frameDims)
 			mm.PtMinTrackSize = windows.Point{
-				X: int32(p.X) + bw,
-				Y: int32(p.Y) + bh,
+				X: int32(p.X),
+				Y: int32(p.Y),
 			}
 		}
 		if p := w.config.MaxSize; p.X > 0 || p.Y > 0 {
+			p = p.Add(frameDims)
 			mm.PtMaxTrackSize = windows.Point{
-				X: int32(p.X) + bw,
-				Y: int32(p.Y) + bh,
+				X: int32(p.X),
+				Y: int32(p.Y),
 			}
 		}
 		return 0
@@ -456,9 +461,6 @@ func getModifiers() key.Modifiers {
 // hitTest returns the non-client area hit by the point, needed to
 // process WM_NCHITTEST.
 func (w *window) hitTest(x, y int) uintptr {
-	if w.config.Mode == Fullscreen {
-		return windows.HTCLIENT
-	}
 	if w.config.Mode != Windowed {
 		// Only windowed mode should allow resizing.
 		return windows.HTCLIENT
@@ -691,8 +693,13 @@ func (w *window) readClipboard() error {
 func (w *window) Configure(options []Option) {
 	dpi := windows.GetSystemDPI()
 	metric := configForDPI(dpi)
-	w.config.apply(metric, options)
-	windows.SetWindowText(w.hwnd, w.config.Title)
+	cnf := w.config
+	cnf.apply(metric, options)
+	w.config.Title = cnf.Title
+	w.config.Decorated = cnf.Decorated
+	w.config.MinSize = cnf.MinSize
+	w.config.MaxSize = cnf.MaxSize
+	windows.SetWindowText(w.hwnd, cnf.Title)
 
 	style := windows.GetWindowLong(w.hwnd, windows.GWL_STYLE)
 	var showMode int32
@@ -700,7 +707,7 @@ func (w *window) Configure(options []Option) {
 	swpStyle := uintptr(windows.SWP_NOZORDER | windows.SWP_FRAMECHANGED)
 	winStyle := uintptr(windows.WS_OVERLAPPEDWINDOW)
 	style &^= winStyle
-	switch w.config.Mode {
+	switch cnf.Mode {
 	case Minimized:
 		style |= winStyle
 		swpStyle |= windows.SWP_NOMOVE | windows.SWP_NOSIZE
@@ -715,13 +722,13 @@ func (w *window) Configure(options []Option) {
 		style |= winStyle
 		showMode = windows.SW_SHOWNORMAL
 		// Get target for client area size.
-		width = int32(w.config.Size.X)
-		height = int32(w.config.Size.Y)
+		width = int32(cnf.Size.X)
+		height = int32(cnf.Size.Y)
 		// Get the current window size and position.
 		wr := windows.GetWindowRect(w.hwnd)
 		x = wr.Left
 		y = wr.Top
-		if w.config.Decorated {
+		if cnf.Decorated {
 			// Compute client size and position. Note that the client size is
 			// equal to the window size when we are in control of decorations.
 			r := windows.Rect{
@@ -731,18 +738,13 @@ func (w *window) Configure(options []Option) {
 			windows.AdjustWindowRectEx(&r, uint32(style), 0, dwExStyle)
 			width = r.Right - r.Left
 			height = r.Bottom - r.Top
-		}
-		if !w.config.Decorated {
+		} else {
 			// Enable drop shadows when we draw decorations.
 			windows.DwmExtendFrameIntoClientArea(w.hwnd, windows.Margins{-1, -1, -1, -1})
 		}
 
 	case Fullscreen:
 		swpStyle |= windows.SWP_NOMOVE | windows.SWP_NOSIZE
-		mi := windows.GetMonitorInfo(w.hwnd)
-		x, y = mi.Monitor.Left, mi.Monitor.Top
-		width = mi.Monitor.Right - mi.Monitor.Left
-		height = mi.Monitor.Bottom - mi.Monitor.Top
 		showMode = windows.SW_SHOWMAXIMIZED
 	}
 	if w.config.HiddenMinimizeButton {
@@ -758,8 +760,6 @@ func (w *window) Configure(options []Option) {
 	windows.SetWindowLong(w.hwnd, windows.GWL_STYLE, style)
 	windows.SetWindowPos(w.hwnd, 0, x, y, width, height, swpStyle)
 	windows.ShowWindow(w.hwnd, showMode)
-
-	w.update()
 }
 
 func (w *window) WriteClipboard(mime string, s []byte) {

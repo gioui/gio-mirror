@@ -75,7 +75,7 @@ func (d DecorationsStyle) layoutDecorations(gtx layout.Context) layout.Dimension
 				case system.ActionMinimize:
 					w = minimizeWindow
 				case system.ActionMaximize:
-					if d.Decorations.Maximized() {
+					if d.Decorations.Maximized {
 						w = maximizedWindow
 					} else {
 						w = maximizeWindow

@@ -23,22 +23,22 @@ __attribute__ ((visibility ("hidden"))) CALayer *gio_layerFactory(BOOL presentWi
 - (void)windowWillMiniaturize:(NSNotification *)notification {
 	NSWindow *window = (NSWindow *)[notification object];
   GioView *view = (GioView *)window.contentView;
-	gio_onHide(view.handle);
+	gio_onDraw(view.handle);
 }
 - (void)windowDidDeminiaturize:(NSNotification *)notification {
 	NSWindow *window = (NSWindow *)[notification object];
   GioView *view = (GioView *)window.contentView;
-	gio_onShow(view.handle);
+	gio_onDraw(view.handle);
 }
 - (void)windowWillEnterFullScreen:(NSNotification *)notification {
 	NSWindow *window = (NSWindow *)[notification object];
   GioView *view = (GioView *)window.contentView;
-	gio_onFullscreen(view.handle);
+	gio_onDraw(view.handle);
 }
 - (void)windowWillExitFullScreen:(NSNotification *)notification {
 	NSWindow *window = (NSWindow *)[notification object];
   GioView *view = (GioView *)window.contentView;
-	gio_onWindowed(view.handle);
+	gio_onDraw(view.handle);
 }
 - (void)windowDidChangeScreen:(NSNotification *)notification {
 	NSWindow *window = (NSWindow *)[notification object];
@@ -202,10 +202,10 @@ static void handleMouse(GioView *view, NSEvent *event, int typ, CGFloat dx, CGFl
     return [[self window] convertRectToScreen:r];
 }
 - (void)applicationWillUnhide:(NSNotification *)notification {
-	gio_onShow(self.handle);
+	gio_onDraw(self.handle);
 }
 - (void)applicationDidHide:(NSNotification *)notification {
-	gio_onHide(self.handle);
+	gio_onDraw(self.handle);
 }
 - (void)dealloc {
 	gio_onDestroy(self.handle);
@@ -387,7 +387,6 @@ CFTypeRef gio_createWindow(CFTypeRef viewRef, CGFloat width, CGFloat height, CGF
 		[window setAcceptsMouseMovedEvents:YES];
 		NSView *view = (__bridge NSView *)viewRef;
 		[window setContentView:view];
-		[window makeFirstResponder:view];
 		window.delegate = globalWindowDel;
 		return (__bridge_retained CFTypeRef)window;
 	}
