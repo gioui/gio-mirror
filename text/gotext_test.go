@@ -51,11 +51,41 @@ func TestEmptyString(t *testing.T) {
 		t.Fatalf("Layout returned no lines for empty string; expected 1")
 	}
 	l := lines.lines[0]
-	if expected := fixed.Int26_6(12094); l.ascent != expected {
+	if expected := fixed.Int26_6(10463); l.ascent != expected {
 		t.Errorf("unexpected ascent for empty string: %v, expected %v", l.ascent, expected)
 	}
-	if expected := fixed.Int26_6(2700); l.descent != expected {
+	if expected := fixed.Int26_6(2336); l.descent != expected {
 		t.Errorf("unexpected descent for empty string: %v, expected %v", l.descent, expected)
+	}
+}
+
+func TestCJKOrNotString(t *testing.T) {
+	ppem := fixed.I(200)
+	ltrFace, _ := opentype.Parse(goregular.TTF)
+	shaper := testShaper(ltrFace)
+
+	for _, r := range [][]rune{
+		[]rune("Sa"),
+		[]rune("SayHi"),
+		[]rune("SayHi 您好"),
+		[]rune("✨ⷽℎ↞⋇ⱜ⪫⢡⽛⣦␆Ⱨⳏ⳯⒛⭣╎⌞⟻⢇┃➡⬎⩱⸇ⷎ⟅▤⼶⇺⩳⎏⤬⬞ⴈ⋠⿶⢒₍☟⽂ⶦ⫰⭢⌹∼▀⾯⧂❽⩏ⓖ⟅⤔⍇␋⽓ₑ⢳⠑❂⊪⢘⽨⃯▴ⷿ"),
+	} {
+		t.Run("ascent/descent should fit font size", func(t *testing.T) {
+			lines := shaper.LayoutRunes(Parameters{
+				PxPerEm:  ppem,
+				MaxWidth: 2000,
+				Locale:   english,
+			}, r)
+
+			l := lines.lines[0]
+
+			if expected := fixed.Int26_6(10463); l.ascent != expected {
+				t.Errorf("unexpected ascent for string: %v, expected %v", l.ascent, expected)
+			}
+			if expected := fixed.Int26_6(2336); l.descent != expected {
+				t.Errorf("unexpected descent for empty string: %v, expected %v", l.descent, expected)
+			}
+		})
 	}
 }
 
