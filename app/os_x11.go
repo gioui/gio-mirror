@@ -383,6 +383,10 @@ func (w *x11Window) ProcessEvent(e event.Event) {
 	w.w.ProcessEvent(e)
 }
 
+func (w *x11Window) DriverName() string {
+	return "x11"
+}
+
 func (w *x11Window) shutdown(err error) {
 	w.ProcessEvent(X11ViewEvent{})
 	w.ProcessEvent(DestroyEvent{Err: err})

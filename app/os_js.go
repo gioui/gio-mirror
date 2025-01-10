@@ -372,6 +372,10 @@ func (w *window) processEvent(e event.Event) bool {
 	return true
 }
 
+func (w *window) DriverName() string {
+	return "js"
+}
+
 func (w *window) Event() event.Event {
 	for {
 		evt, ok := w.w.nextEvent()

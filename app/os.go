@@ -45,6 +45,12 @@ type Config struct {
 	CustomRenderer bool
 	// Decorated reports whether window decorations are provided automatically.
 	Decorated bool
+
+	// HiddenMinimizeButton hide the window's minimize button (only works for windows and macOS)
+	HiddenMinimizeButton bool
+	// HiddenMaximizeButton hide the window's maximize button (only works for windows and macOS)
+	HiddenMaximizeButton bool
+
 	// Focused reports whether has the keyboard focus.
 	Focused bool
 	// decoHeight is the height of the fallback decoration for platforms such
@@ -176,6 +182,8 @@ type context interface {
 // driver is the interface for the platform implementation
 // of a window.
 type driver interface {
+	// DriverName get driver anme
+	DriverName() string
 	// Event blocks until an event is available and returns it.
 	Event() event.Event
 	// Invalidate requests a FrameEvent.
