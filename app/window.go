@@ -272,6 +272,14 @@ func (w *Window) updateState() {
 	w.updateAnimation()
 }
 
+// DriverName get driver name
+func (w *Window) DriverName() string {
+	if w.driver == nil {
+		return ""
+	}
+	return w.driver.DriverName()
+}
+
 // Invalidate the window such that a [FrameEvent] will be generated immediately.
 // If the window is inactive, an unspecified event is sent instead.
 //
@@ -969,6 +977,20 @@ func CustomRenderer(custom bool) Option {
 func Decorated(enabled bool) Option {
 	return func(_ unit.Metric, cnf *Config) {
 		cnf.Decorated = enabled
+	}
+}
+
+// HiddenMinimizeButton controls whether show minimize button on macos and windows
+func HiddenMinimizeButton(hidden bool) Option {
+	return func(_ unit.Metric, cnf *Config) {
+		cnf.HiddenMinimizeButton = hidden
+	}
+}
+
+// HiddenMaximizeButton controls whether show maximize button on macos and windows
+func HiddenMaximizeButton(hidden bool) Option {
+	return func(_ unit.Metric, cnf *Config) {
+		cnf.HiddenMaximizeButton = hidden
 	}
 }
 

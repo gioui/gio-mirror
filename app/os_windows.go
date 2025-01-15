@@ -609,6 +609,10 @@ func (w *window) ProcessEvent(e event.Event) {
 	w.loop.FlushEvents()
 }
 
+func (w *window) DriverName() string {
+	return "windows"
+}
+
 func (w *window) Event() event.Event {
 	return w.loop.Event()
 }
@@ -749,6 +753,16 @@ func (w *window) Configure(options []Option) {
 	case Fullscreen:
 		swpStyle |= windows.SWP_NOMOVE | windows.SWP_NOSIZE
 		showMode = windows.SW_SHOWMAXIMIZED
+	}
+	if w.config.HiddenMinimizeButton {
+		style &^= windows.WS_MINIMIZEBOX
+	} else {
+		style |= windows.WS_MINIMIZEBOX
+	}
+	if w.config.HiddenMaximizeButton {
+		style &^= windows.WS_MAXIMIZEBOX
+	} else {
+		style |= windows.WS_MAXIMIZEBOX
 	}
 	windows.SetWindowLong(w.hwnd, windows.GWL_STYLE, style)
 	windows.SetWindowPos(w.hwnd, 0, x, y, width, height, swpStyle)
