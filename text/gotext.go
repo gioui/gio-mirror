@@ -902,11 +902,18 @@ func toLine(faceToIndex map[*font.Font]int, o shaping.Line, dir system.TextDirec
 		line.visualOrder[run.VisualIndex] = i
 		line.runeCount += run.Runes.Count
 		line.width += run.Advance
-		if line.ascent < run.LineBounds.Ascent {
-			line.ascent = run.LineBounds.Ascent
+
+		// fix ascent to make all glyphes (CJK or not) always in same baseline
+		// fixedDescent + fixedAscent should equal fontSize
+		scale := fixedToFloat(run.Size) / fixedToFloat(run.LineBounds.LineHeight())
+		fixedAscent := floatToFixed(fixedToFloat(run.LineBounds.Ascent) * scale)
+		fixedDescent := floatToFixed(fixedToFloat(-run.LineBounds.Descent+run.LineBounds.Gap) * scale)
+
+		if line.ascent < fixedAscent {
+			line.ascent = fixedAscent
 		}
-		if line.descent < -run.LineBounds.Descent+run.LineBounds.Gap {
-			line.descent = -run.LineBounds.Descent + run.LineBounds.Gap
+		if line.descent < fixedDescent {
+			line.descent = fixedDescent
 		}
 	}
 	line.lineHeight = maxSize
